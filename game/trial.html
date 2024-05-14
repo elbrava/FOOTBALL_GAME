@@ -1,0 +1,417 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Making your first Phaser 3 Game - Part 10</title>
+
+    <script src="phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="phasergame"></div>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@v3.80.1/dist/phaser.min.js"></script>
+    <script type="text/javascript">
+        var platforms;
+        var players;
+        var ball;
+        var goal1;
+        var goal2;
+        var goalPosts;
+        var teams;
+        var swiped_state = 'IDLE';
+        class Player {
+            constructor(scene, x, y, radius) {
+                // Create a Graphics object
+                this.graphics = scene.add.graphics({ x: x, y: y });
+                this.radius = radius
+                this.scene = scene
+                // Draw filled circle
+                this.graphics.fillStyle(0xffffff); // White color
+                this.graphics.fillCircle(0, 0, radius);
+
+                // Draw circle with stroke
+                this.graphics.lineStyle(1, 0xffffff); // White color, 5 pixels thick
+                this.graphics.strokeCircle(0, 0, radius + 5);
+                // Enable physics on the graphics object
+                scene.physics.add.existing(this.graphics);
+
+                // Set circle body on the graphics object
+                this.graphics.body.setCircle(radius);
+                this.graphics.body.setCollideWorldBounds(true);
+                this.graphics.body.setBounce(0)
+                this.graphics.body.setDrag(0.5)
+                // Enable input events on the graphics object
+                // Flag to track selection state
+                this.isSelected = false;
+                this.possession = false
+                this.angle = 0
+                this.target_angle = 0
+                this.turned = false
+                this.shoot = false
+
+            }
+
+            setPosition(x, y) {
+                this.graphics.x = x;
+                this.graphics.y = y;
+            }
+
+            select(fill) {
+                // Toggle selection state
+                this.isSelected = true;
+                this.body = this.graphics.body
+
+                this.graphics.clear()
+                this.graphics = this.scene.add.graphics({ x: this.graphics.body.x, y: this.graphics.body.y });
+                // Draw filled circle
+
+                // White color
+                // Update visual feedback (e.g., change color)
+                this.graphics.fillStyle(0x00ff00);
+                if (fill) {
+                    this.graphics.fillStyle(fill);
+                }
+                // Green tint when selected
+                this.graphics.fillCircle(0, 0, this.radius);
+                // Draw circle with stroke
+                this.graphics.lineStyle(1, 0xffffff); // White color, 5 pixels thick
+                this.graphics.strokeCircle(0, 0, this.radius + 5);
+                // Enable physics on the graphics object
+                this.scene.physics.add.existing(this.graphics);
+
+                // Set circle body on the graphics object
+                this.graphics.body.setCircle(this.radius);
+                this.graphics.body.setCollideWorldBounds(true);
+                this.graphics.body.setBounce(0)
+                this.graphics.body.setDrag(0.5)
+                this.graphics.body.setVelocity(this.body.velocity.x, this.body.velocity.y);
+                this.graphics.body.setAcceleration(this.body.acceleration.x, this.body.acceleration.y);
+            }
+            diselect() {
+                this.isSelected = false;
+                this.body = this.graphics.body
+
+                this.graphics.clear()
+                this.graphics = this.scene.add.graphics({ x: this.graphics.body.x, y: this.graphics.body.y });
+                // Draw filled circle
+                // White color
+                this.graphics.fillStyle(0xffffff);
+                this.graphics.fillCircle(0, 0, this.radius);
+                // Draw circle with stroke
+                this.graphics.lineStyle(1, 0xffffff); // White color, 5 pixels thick
+                this.graphics.strokeCircle(0, 0, this.radius + 5);
+                // Enable physics on the graphics object
+                this.scene.physics.add.existing(this.graphics);
+                // Set circle body on the graphics object
+                this.graphics.body.setCircle(this.radius);
+                this.graphics.body.setCollideWorldBounds(true);
+                this.graphics.body.setBounce(0)
+                this.graphics.body.setDrag(0.5)
+                this.graphics.body.setVelocity(this.body.velocity.x, this.body.velocity.y);
+                this.graphics.body.setAcceleration(this.body.acceleration.x, this.body.acceleration.y);
+
+            }
+            possessBall() {
+                this.possession = true
+                ball.body.stop()
+                this.select(0x0000ff)
+
+
+            }
+            nonpossesion() {
+                this.possession = false
+                this.diselect()
+
+            }
+            accelerateToPoint(pointX, pointY, speed) {
+                // Calculate direction towards the point
+                let angle = Phaser.Math.Angle.Between(this.graphics.x, this.graphics.y, pointX, pointY);
+                this.graphics.body.stop()
+                // Set velocity based on direction and speed
+                this.graphics.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                this.target_x = pointX
+                this.target_y = pointY
+                this.target_angle = angle
+            }
+            doubleTrouble(speed, angle) {
+                console.log("here")
+                if (this.possession) {
+                    this.shoot = true
+                    this.nonpossesion()
+                    ball.body.stop()
+
+                    ball.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed)
+
+                } else {
+
+                    this.graphics.body.stop()
+                    this.graphics.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+                }
+
+            }
+
+            update() {
+                if ((this.graphics.body.x < 0 || this.graphics.body.x > 800) || (this.graphics.body.y < 0 || this.graphics.body.y > 600)) {
+                    //THIS GETTING OUT
+                    this.graphics.body.setAcceleration(0, 0);
+                    this.graphics.body.setVelocity(0, 0)
+                }
+                if (this.target_x || this.target_y) {
+                    let distance = Phaser.Math.Distance.Between(this.graphics.body.x, this.graphics.body.y, this.target_x, this.target_y);
+                    if (distance < 4) {
+                        this.graphics.body.setAcceleration(0, 0);
+                        this.graphics.body.setVelocity(0, 0)
+                    }
+
+                }
+                // Check FOR POSSESION
+                if (!this.shoot) {
+                    let distanceBall = Phaser.Math.Distance.Between(this.graphics.body.x, this.graphics.body.y, ball.body.x, ball.body.y);
+                    if (distanceBall < this.radius) {
+                        this.possessBall()
+                        for (let player of players_obj) {
+                            if (player !== this) {
+                                player.nonpossesion()
+                            }
+                        }
+                        // ball.setPosition(20,20)
+                    }
+                }
+
+
+            }
+        }
+        class Team {
+            constructor(name, score) {
+                this.name = name
+                this.goal = 0
+                this.score = score
+
+
+            }
+            onGoal() {
+                this.goal += 1
+                this.score.setText(this.name + ": " + this.goal);
+
+            }
+            onPost(post) {
+                this.post = post
+
+            }
+
+        }
+        // Initialize Phaser game config
+        var config = {
+            type: Phaser.AUTO,
+            parent: "phasergame",
+            scale: {
+                mode: Phaser.Scale.FIT,
+                parent: "phasergame",
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                width: 800,
+                height: 600
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: true // Set to true for debugging
+
+                }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        var game = new Phaser.Game(config);
+
+        var players;
+        var players_obj = []
+        function preload() {
+            this.load.scenePlugin({
+                key: 'rexgesturesplugin',
+                url: 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/dist/rexgesturesplugin.min.js',
+                sceneKey: 'rexGestures'
+            });
+            this.load.image("ball", "assets/bomb.png");
+            this.load.image("ground", "assets/platform.png");
+        }
+
+
+        function create() {
+            // Create players group
+            platforms = this.physics.add.staticGroup();
+            //  Here we create the ground.
+            //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+            //  Now let's create some ledges
+            platforms.create(1, 375, "ground").setScale(0.3).refreshBody();
+            platforms.create(1, 225, "ground").setScale(0.3).refreshBody();
+            platforms.create(799, 375, "ground").setScale(0.3).refreshBody();
+            platforms.create(799, 225, "ground").setScale(0.3).refreshBody();
+            players = this.physics.add.group();
+            this.physics.world.setBounds(0, 0, 800, 600, true, true, true, true);
+            // Create player instances and add them to the group
+            for (let i = 0; i < 2; i++) {
+                let player = new Player(this, Phaser.Math.Between(100, 700), Phaser.Math.Between(100, 500), 15);
+                players.add(player.graphics);
+                players_obj.push(player)
+            }
+            ball = this.physics.add.sprite(400, 300, "ball").setScale(1);
+            ball.setBounce(0.7);
+            ball.setDrag(0.5)
+            ball.setCollideWorldBounds(true);
+            // Enable collision between players
+            let scoreText1 = this.add.text(16, 16, "You : 0", {
+                fontSize: "16px",
+                fill: "#FFFFFF",
+            });
+            let scoreText2 = this.add.text(16, 32, "Opponent: 0", {
+                fontSize: "16px",
+                fill: "#FFFFFF",
+            });
+            let teamYou = new Team("You", scoreText1);
+            let teamOpp = new Team("Opponent", scoreText2);
+            goal1 = this.add.rectangle(10, 300, 100, 130).setFillStyle(0xffff00);
+            goal2 = this.add.rectangle(790, 300, 100, 130).setFillStyle(0xffff00);
+            goalPosts = [goal1, goal2]
+            teamOpp.onPost(goal1)
+            teamYou.onPost(goal2)
+            teams = [teamOpp, teamYou]
+            this.physics.add.collider(players, players);
+            this.physics.add.collider(players, platforms);
+            this.physics.add.collider(platforms, ball);
+
+
+            this.swipeInput = this.rexGestures.add.swipe({ velocityThreshold: 700 })
+                .on('swipe', function (swipe) {
+                    // console.log(swipe)
+                    // console.log(swipe.state)
+                }, this)
+            // .onDragStart((swipe)=>{
+            //     console.log(swipe.state)
+
+            // },this);
+
+        }
+
+
+
+
+        function update() {
+            // Handle pointer click event
+            // console.log(ball.x, ball.y)
+
+            if (this.swipeInput.isSwiped) {
+                for (let player of players_obj) {
+                    if (player.isSelected) {
+                        player.doubleTrouble(this.swipeInput.getVelocity(), this.swipeInput.getVelocityAngle())
+                    }
+
+                }
+            } else {
+                // console.log(this.swipeInput.state)
+                // CHECK PREVOIS STATE TO CONFIRM IT IS OT A SWIPE
+                if (swiped_state == 'IDLE') {
+                    if (game.input.activePointer.isDown) {
+                        // Get clicked point coordinates
+                        let pointX = game.input.activePointer.worldX;
+                        let pointY = game.input.activePointer.worldY;
+                        // Iterate through each player
+                        let selection = false
+                        let player_;
+                        for (let player of players_obj) {
+                            if (!selection) {
+                                if (new Phaser.Geom.Circle(player.graphics.body.x, player.graphics.body.y, player.radius).contains(pointX, pointY)) {
+                                    player.select()
+                                    selection = true
+                                    player_ = player
+                                }
+                            }
+                        }
+                        // Check if the player is selected
+                        if (selection == false) {
+
+                            for (let player of players_obj) {
+                                // SINGLE CLICK
+                                if (player.isSelected) {
+                                    // Accelerate the selected player towards the clicked point
+                                    player.shoot=false
+                                    player.accelerateToPoint(pointX, pointY, 200); // Adjust speed as needed
+                                }
+                            }
+                        } else {
+                            if (player_) {
+                                for (let player of players_obj) {
+                                    if (!(player_ == player)) {
+                                        player.diselect()
+                                        player.shoot=false
+                                    }
+                                }
+                            }
+
+                        }
+
+
+                    }
+                }
+                swiped_state = this.swipeInput.state
+            }
+
+            for (let player of players_obj) {
+                player.update()
+                if (player.possession) {
+                    let distanceBall = Phaser.Math.Distance.Between(player.graphics.body.x, player.graphics.body.y, ball.body.x, ball.body.y);
+                    let angleBall = Phaser.Math.Angle.Between(player.graphics.x, player.graphics.y, ball.body.x, ball.body.y);
+                    let val = (player.target_angle - angleBall)
+                    if (val > 0.001 || distanceBall != (player.radius + 5)) {
+                        Phaser.Actions.RotateAroundDistance([ball], { "x": player.graphics.body.x, "y": player.graphics.body.y }, val, (player.radius + 5))
+                    }
+
+                }
+            }
+            for (let team of teams) {
+                const { left, top, width, height } = team.post.getBounds();
+
+                const bodiesInRect = this.physics.overlapRect(left, top, width, height);
+                // console.log(bodiesInRect)
+                if (bodiesInRect.length > 0) {
+                    // console.log(bodiesInRect)
+                    if (bodiesInRect[0].gameObject == ball) {
+                        console.log("goal")
+                        team.onGoal()
+                        ball.setPosition(400, 300)
+                        for (let player of players_obj) {
+                            player.nonpossesion()
+
+                        }
+                        ball.body.stop()
+                    }
+                }
+
+            }
+
+        }
+
+
+    </script>
+</body>
+
+</html>
+<!-- 
+
+SCALING --DONE
+RECTANGLE GOAL --DONE
+POSSESION --DONE
+ROTATING OF BALL AROUND PLAYER  --DONE
+SHOOTING AND TACKLING  __THROUGH SWIPING --DONE WITH TACKLING
+NETWORKING __DONE LATTER ON AFTER PROFILE AND TOURNAMENT SETUP AND DEVELOPMNET OF SDK
+-->
